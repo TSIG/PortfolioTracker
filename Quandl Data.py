@@ -6,16 +6,19 @@ import pyodbc
 import quandl
 import time
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
+import datetime
+
 
 class Stock:
     def __init__(self, ticker, buy_date):
         #init details of stock
-        self.ticker = 'WIKI/' + ticker
+        self.ticker = ticker
+        self.DBticker = 'WIKI/' + ticker
         self.buy_date = buy_date
         self.percent_change = 0
         #grab stock's info since buy date
-        self.pandas_DF = quandl.get(self.ticker, start_date = self.buy_date, end_date = time.strftime("%Y/%m?%d"))
+        self.pandas_DF = quandl.get(self.DBticker, start_date = self.buy_date, end_date = time.strftime("%Y/%m?%d"))
 	#add date column
         self.pandas_DF['Date'] = pd.to_datetime(self.pandas_DF.index)
                 
@@ -45,21 +48,28 @@ class Stock:
         
     def display_total(self):
         return self.pandas_DF
+    
+    def get_ticker(self):
+        return self.ticker
+    
+    #function for getting previous day's stock information. Need to add parameters for weekend vs weekday
+    def get_day_update(self):
+        DF_1_day = quandl.get(self.DBticker, start_date = datetime.date.today()
+        - timedelta(days=1), end_date = datetime.date.today() - timedelta(days=1))
+        return DF_1_day
 
-#Creating test class to input data into db
-ticker = 'CRM'
-current_date = time.strftime("%Y/%m?%d")
+
+ticker = 'AAPL'
 test = Stock(ticker, "2016-10-24")
 
 
-#SQL Server information
 server = 'cs1'
 db1 = 'TSIG-StockDatabase'
 tcon = 'yes'
 uname = 'nrode17'
 pword = '6336523NdR'
 
-#the query to input the data into the db
+    
 q = '''\
 insert into PortfolioStockList
     ( 
@@ -79,20 +89,18 @@ insert into PortfolioStockList
         AdjVolume)
     VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 '''
-
-#Connecting to the actual Database
 connection = pyodbc.connect(driver='{SQL Server};',
                             host = server,
                             database = db1,
                             trusted_connection=tcon, user=uname, password=pword)
 cursor = connection.cursor()
 
-#run through all the rows in the pandas df and input each data element into the specified slots within the query
+
 for index, row in test.display_total().iterrows():
-    cursor.execute(q, ticker, row['Date'], row['Open'], row['High'], row['Low'],
+    cursor.execute(q, test.get_ticker(), row['Date'], row['Open'], row['High'], row['Low'],
     row['Close'], row['Volume'], row['Ex-Dividend'], row['Split Ratio'], 
     row['Adj. Open'], row['Adj. High'], row['Adj. Low'], row['Adj. Close'], row['Adj. Volume'])
     
-connection.commit()
+#connection.commit()
 connection.close()
 print("END")
