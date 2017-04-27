@@ -1,18 +1,12 @@
+# To change this license header, choose License Headers in Project Properties.
+# To change this template file, choose Tools | Templates
+# and open the template in the editor.
+
+import pyodbc
 import quandl
 import time
-import numpy as np
 import pandas as pd
-
-
-#ticker = "AAPL"
-#buy_date = "2016-9-24"
-#current_date = time.strftime("%Y/%m/%d")
-#current_date = time.strftime("%Y/%m?%d")
-
-
-#pandas_DF = quandl.get("WIKI/AAPL",start_date = buy_date, end_date = current_date)
-
-#print(pandas_DF['Open'])
+from datetime import datetime
 
 class Stock:
     def __init__(self, ticker, buy_date):
@@ -22,8 +16,9 @@ class Stock:
         self.percent_change = 0
         #grab stock's info since buy date
         self.pandas_DF = quandl.get(self.ticker, start_date = self.buy_date, end_date = time.strftime("%Y/%m?%d"))
+	#add date column
+        self.pandas_DF['Date'] = pd.to_datetime(self.pandas_DF.index)
                 
-        
     def display_5_day(self):
         DF_5_day = self.pandas_DF.iloc[::5, :]
         return DF_5_day
@@ -50,3 +45,54 @@ class Stock:
         
     def display_total(self):
         return self.pandas_DF
+
+#Creating test class to input data into db
+ticker = 'CRM'
+current_date = time.strftime("%Y/%m?%d")
+test = Stock(ticker, "2016-10-24")
+
+
+#SQL Server information
+server = 'cs1'
+db1 = 'TSIG-StockDatabase'
+tcon = 'yes'
+uname = 'nrode17'
+pword = '6336523NdR'
+
+#the query to input the data into the db
+q = '''\
+insert into PortfolioStockList
+    ( 
+        CompanyTicker, 
+        Date, 
+        PriceOpen, 
+        PriceHigh, 
+        PriceLow, 
+        PriceClose, 
+        Volume, 
+        ExDividend, 
+        SplitRatio, 
+        AdjOpen, 
+        AdjHigh, 
+        AdjLow, 
+        AdjClose, 
+        AdjVolume)
+    VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+'''
+
+#Connecting to the actual Database
+connection = pyodbc.connect(driver='{SQL Server};',
+                            host = server,
+                            database = db1,
+                            trusted_connection=tcon, user=uname, password=pword)
+cursor = connection.cursor()
+
+#run through all the rows in the pandas df and input each data element into the specified slots within the query
+for index, row in test.display_total().iterrows():
+    cursor.execute(q, ticker, row['Date'], row['Open'], row['High'], row['Low'],
+    row['Close'], row['Volume'], row['Ex-Dividend'], row['Split Ratio'], 
+    row['Adj. Open'], row['Adj. High'], row['Adj. Low'], row['Adj. Close'], row['Adj. Volume'])
+    
+connection.commit()
+connection.close()
+print("END")
