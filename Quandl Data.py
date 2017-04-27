@@ -53,6 +53,7 @@ class Stock:
         return self.ticker
     
     #function for getting previous day's stock information. Need to add parameters for weekend vs weekday
+    # i.e. only run this function on weekdays & saturday, or do an if else satement to determine what to do
     def get_day_update(self):
         DF_1_day = quandl.get(self.DBticker, start_date = datetime.date.today()
         - timedelta(days=1), end_date = datetime.date.today() - timedelta(days=1))
