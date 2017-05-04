@@ -10,6 +10,108 @@ from datetime import datetime, timedelta
 import datetime
 
 
+class SQLConnection:
+    def __init__(self):
+        self.server = 'cs1'
+        self.db1 = 'TSIG-StockDatabase'
+        self.tcon = 'yes'
+        self.uname = 'nrode17'
+        self.pword = '6336523NdR'
+        self.connection = pyodbc.connect(driver='{SQL Server};', 
+                                            host = self.server, 
+                                            database = self.db1, 
+                                            trusted_connection=self.tcon, 
+                                            user=self.uname, 
+                                            password=self.pword)                     
+        self.cursor = self.connection.cursor()
+        
+        
+        
+        
+        #Query for storing the Portfolio stock data
+        self.storePortfolioDataQuery = '''\
+        insert into PortfolioStockList
+            ( 
+                CompanyTicker, 
+                Date, 
+                PriceOpen, 
+                PriceHigh, 
+                PriceLow, 
+                PriceClose, 
+                Volume, 
+                ExDividend, 
+                SplitRatio, 
+                AdjOpen, 
+                AdjHigh, 
+                AdjLow, 
+                AdjClose, 
+                AdjVolume)
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        '''
+        
+        #Query that creates a temp table that will store data that the user
+        #searches for, not portfolio stock data
+        self.createTempTableQuery = '''\
+        create table #TempPortfolio
+            (
+                CompanyTicker nchar(5) not null, 
+                Date date, 
+                PriceOpen float, 
+                PriceHigh float, 
+                PriceLow float, 
+                PriceClose float, 
+                Volume int, 
+                ExDividend float, 
+                SplitRatio float, 
+                AdjOpen float, 
+                AdjHigh float, 
+                AdjLow float, 
+                AdjClose float, 
+                AdjVolume int)
+        '''
+        
+        
+        #Query that inserts the temporary stock data into the temp table
+        self.insertIntoTempTableQuery = '''\
+        insert into #TempPortfolio
+            ( 
+                CompanyTicker, 
+                Date, 
+                PriceOpen, 
+                PriceHigh, 
+                PriceLow, 
+                PriceClose, 
+                Volume, 
+                ExDividend, 
+                SplitRatio, 
+                AdjOpen, 
+                AdjHigh, 
+                AdjLow, 
+                AdjClose, 
+                AdjVolume)
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        '''
+        
+        #actually executes the query for creating the table
+        self.cursor.execute(self.createTempTableQuery)
+
+    #Executes putting the portfolio data into the db    
+    def execute_insertPortfolioData(self, stock):
+        for index, row in stock.display_total().iterrows():
+            self.cursor.execute(self.storePortfolioDataQuery, stock.get_ticker(), row['Date'], row['Open'],
+            row['High'], row['Low'], row['Close'], row['Volume'], 
+            row['Ex-Dividend'], row['Split Ratio'], row['Adj. Open'],
+            row['Adj. High'], row['Adj. Low'], row['Adj. Close'], 
+            row['Adj. Volume'])
+            
+            
+   #Commits and closes the connection and queries         
+    def commit_and_close(self):
+        self.connection.commit()
+        self.connection.close()
+
+
+
 class Stock:
     def __init__(self, ticker, buy_date):
         #init details of stock
@@ -53,7 +155,6 @@ class Stock:
         return self.ticker
     
     #function for getting previous day's stock information. Need to add parameters for weekend vs weekday
-    # i.e. only run this function on weekdays & saturday, or do an if else satement to determine what to do
     def get_day_update(self):
         DF_1_day = quandl.get(self.DBticker, start_date = datetime.date.today()
         - timedelta(days=1), end_date = datetime.date.today() - timedelta(days=1))
@@ -61,47 +162,12 @@ class Stock:
 
 
 ticker = 'AAPL'
+
 test = Stock(ticker, "2016-10-24")
+print(test.get_day_update())
 
+newSQL = SQLConnection()
+newSQL.execute_insertPortfolioData(test)
+newSQL.commit_and_close()
 
-server = 'cs1'
-db1 = 'TSIG-StockDatabase'
-tcon = 'yes'
-uname = 'nrode17'
-pword = '6336523NdR'
-
-    
-q = '''\
-insert into PortfolioStockList
-    ( 
-        CompanyTicker, 
-        Date, 
-        PriceOpen, 
-        PriceHigh, 
-        PriceLow, 
-        PriceClose, 
-        Volume, 
-        ExDividend, 
-        SplitRatio, 
-        AdjOpen, 
-        AdjHigh, 
-        AdjLow, 
-        AdjClose, 
-        AdjVolume)
-    VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-'''
-connection = pyodbc.connect(driver='{SQL Server};',
-                            host = server,
-                            database = db1,
-                            trusted_connection=tcon, user=uname, password=pword)
-cursor = connection.cursor()
-
-
-for index, row in test.display_total().iterrows():
-    cursor.execute(q, test.get_ticker(), row['Date'], row['Open'], row['High'], row['Low'],
-    row['Close'], row['Volume'], row['Ex-Dividend'], row['Split Ratio'], 
-    row['Adj. Open'], row['Adj. High'], row['Adj. Low'], row['Adj. Close'], row['Adj. Volume'])
-    
-#connection.commit()
-connection.close()
 print("END")
